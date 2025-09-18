@@ -120,7 +120,7 @@ function DeviceFormDialog({
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const isEdit = Boolean(initial?.id);
-
+  const NONE = "none";
   const [form, setForm] = useState<Partial<Device>>({
     asset_tag: initial?.asset_tag ?? "",
     serial_no: initial?.serial_no ?? "",
@@ -215,7 +215,7 @@ function DeviceFormDialog({
             const NONE = "none";
 
             const [form, setForm] = useState<Partial<Device>>({
-    asset_tag: initial?.asset_tag ?? "",
+    asset_tag} initial?.asset_tag ?? "",
     serial_no: initial?.serial_no ?? "",
     status: (initial?.status ?? "active") as Status,
     model: initial?.model ?? "",
@@ -239,7 +239,10 @@ function DeviceFormDialog({
   <Select
     value={form.department_id != null ? String(form.department_id) : NONE}
     onValueChange={(v) =>
-      setForm((f) => ({ ...f, department_id: v === NONE ? undefined : Number(v) }))
+      setForm((f) => ({
+        ...f,
+        department_id: v === NONE ? undefined : Number(v),
+      }))
     }
   >
     <SelectTrigger id="department_id">

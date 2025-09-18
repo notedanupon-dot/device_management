@@ -8,8 +8,8 @@ import { Toaster } from "./components/ui/sonner";
 export default function App() {
   return (
     <>
-      <Toaster />
       <InventoryPage />
+      <Toaster richColors position="top-center" />
     </>
   );
 }

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Plus, Pencil, Trash2, Download, RefreshCw, QrCode } from "lucide-react";
-
 // shadcn/ui
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -9,19 +8,17 @@ import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { useToast } from "../components/ui/use-toast";
+import { Toaster } from "../components/ui/toaster";
 
-// toast (แนะนำของ shadcn) -> Sonner
-import { Toaster, toast } from "sonner";
-
-/* ===================== Supabase Client ===================== */
+// ---------- Supabase ----------
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
   import.meta.env.VITE_SUPABASE_ANON_KEY as string
 );
 
-/* ========================= Types ========================== */
+// ---------- Types ----------
 export type Status = "active" | "in_repair" | "retired" | "lost";
-
 export type Device = {
   id: string;
   asset_tag: string;
@@ -34,15 +31,9 @@ export type Device = {
   department_id?: number | null;
   deleted_at?: string | null;
 };
+export type Department = { id: number; name: string };
 
-export type Department = {
-  id: number;                 // int8
-  code: string | null;        // text
-  name: string;               // text
-  cost_center: string | null; // text
-};
-
-/* ======================== Helpers ========================= */
+// ---------- Helpers ----------
 const cx = (...xs: Array<string | false | undefined | null>) => xs.filter(Boolean).join(" ");
 
 function StatusBadge({ value }: { value: Status }) {
@@ -59,11 +50,13 @@ function toCSV(rows: Record<string, unknown>[], headers?: string[]) {
   if (!rows?.length) return "";
   const cols = headers ?? Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
   const esc = (v: unknown) => {
-    if (v == null) return "";
+    if (v === null || v === undefined) return "";
     const s = String(v);
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    return /[",
+]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
-  return [cols.join(","), ...rows.map((r) => cols.map((c) => esc((r as any)[c])).join(","))].join("\n");
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => esc((r as any)[c])).join(","))].join("
+");
 }
 
 async function parseCSVFile(file: File): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
@@ -79,9 +72,11 @@ async function parseCSVFile(file: File): Promise<{ headers: string[]; rows: Reco
       else cur += ch;
     } else {
       if (ch === '"') inQ = true;
-      else if (ch === ",") pushCell();
-      else if (ch === "\n") { pushCell(); pushRow(); }
-      else if (ch !== "\r") cur += ch;
+      else if (ch === ',') pushCell();
+      else if (ch === '
+') { pushCell(); pushRow(); }
+      else if (ch !== '
+') cur += ch;
     }
     i++;
   }
@@ -102,8 +97,7 @@ async function upsertBatch(devs: Partial<Device>[]) {
   }
 }
 
-/* ==================== Device Form Dialog =================== */
-
+// ---------- Device Form Dialog ----------
 function DeviceFormDialog({
   open,
   onOpenChange,
@@ -120,7 +114,7 @@ function DeviceFormDialog({
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const isEdit = Boolean(initial?.id);
-  const NONE = "none";
+
   const [form, setForm] = useState<Partial<Device>>({
     asset_tag: initial?.asset_tag ?? "",
     serial_no: initial?.serial_no ?? "",
@@ -141,13 +135,10 @@ function DeviceFormDialog({
     });
   }, [initial]);
 
-  const labelOf = (d: Department) =>
-    `${d.code ? d.code + " · " : ""}${d.name}${d.cost_center ? " (" + d.cost_center + ")" : ""}`;
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.asset_tag || !form.serial_no) {
-      toast("กรอกข้อมูลไม่ครบ", { description: "ต้องมี Asset Tag และ Serial No." });
+      toast({ title: "กรอกข้อมูลไม่ครบ", description: "ต้องมี Asset Tag และ Serial No." });
       return;
     }
     try {
@@ -162,7 +153,7 @@ function DeviceFormDialog({
           department_id: form.department_id ?? null,
         }).eq("id", initial.id);
         if (error) throw error;
-        toast.success("บันทึกแล้ว");
+        toast({ title: "บันทึกแล้ว", description: `อัปเดต ${form.asset_tag}` });
       } else {
         const { error } = await supabase.from("devices").insert({
           asset_tag: form.asset_tag!,
@@ -173,20 +164,24 @@ function DeviceFormDialog({
           department_id: form.department_id ?? null,
         });
         if (error) throw error;
-        toast.success("เพิ่มอุปกรณ์แล้ว");
+        toast({ title: "เพิ่มอุปกรณ์แล้ว", description: form.asset_tag });
       }
       onOpenChange(false);
       onSaved();
     } catch (err: any) {
-      toast.error("บันทึกล้มเหลว", { description: err?.message ?? String(err) });
+      toast({ title: "บันทึกล้มเหลว", description: err?.message ?? String(err) });
     } finally {
       setSaving(false);
     }
   }
 
+  // NOTE: shadcn Select ห้ามใช้ค่า "" ใน SelectItem
+  // ใช้ค่า "none" แล้ว map กลับเป็น undefined/Null แทน
+  const departmentValue = form.department_id ? String(form.department_id) : "none";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg" aria-describedby="">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? "แก้ไขอุปกรณ์" : "เพิ่มอุปกรณ์"}</DialogTitle>
         </DialogHeader>
@@ -212,54 +207,18 @@ function DeviceFormDialog({
                 </SelectContent>
               </Select>
             </div>
-            const NONE = "none";
-
-            const [form, setForm] = useState<Partial<Device>>({
-    asset_tag} initial?.asset_tag ?? "",
-    serial_no: initial?.serial_no ?? "",
-    status: (initial?.status ?? "active") as Status,
-    model: initial?.model ?? "",
-    brand: initial?.brand ?? "",
-    department_id: initial?.department_id ?? undefined,
-  });
-
-  useEffect(() => {
-    setForm({
-      asset_tag: initial?.asset_tag ?? "",
-      serial_no: initial?.serial_no ?? "",
-      status: (initial?.status ?? "active") as Status,
-      model: initial?.model ?? "",
-      brand: initial?.brand ?? "",
-      department_id: initial?.department_id ?? undefined,
-    });
-  }, [initial]);
-
-<div className="space-y-1.5">
-  <Label htmlFor="department_id">แผนก</Label>
-  <Select
-    value={form.department_id != null ? String(form.department_id) : NONE}
-    onValueChange={(v) =>
-      setForm((f) => ({
-        ...f,
-        department_id: v === NONE ? undefined : Number(v),
-      }))
-    }
-  >
-    <SelectTrigger id="department_id">
-      <SelectValue placeholder="เลือกแผนก" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value={NONE}>— ไม่ระบุ —</SelectItem>
-      {departments.map((d) => (
-        <SelectItem key={d.id} value={String(d.id)}>
-          {d.name}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
-
-
+            <div className="space-y-1.5">
+              <Label htmlFor="department_id">แผนก</Label>
+              <Select value={departmentValue} onValueChange={(v) => setForm((f) => ({ ...f, department_id: v === "none" ? undefined : Number(v) }))}>
+                <SelectTrigger id="department_id"><SelectValue placeholder="เลือกแผนก" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— ไม่ระบุ —</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="model">Model</Label>
               <Input id="model" value={form.model || ""} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />
@@ -279,50 +238,25 @@ function DeviceFormDialog({
   );
 }
 
-/* ======================== Main Page ======================== */
+// ---------- Main Page ----------
 export default function InventoryPage() {
+  const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement | null>(null);
-
   const [departments, setDepartments] = useState<Department[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const [filters, setFilters] = useState<{ search: string; status: "all" | Status; departmentId: string | "all" }>({
-    search: "",
-    status: "all",
-    departmentId: "all",
-  });
-
+  const [filters, setFilters] = useState<{ search: string; status: "all" | Status; departmentId: string | "all" }>({ search: "", status: "all", departmentId: "all" });
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Device | null>(null);
 
-  /* Departments */
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
-        .from("departments")
-        .select("id, code, name, cost_center")
-        .order("code", { ascending: true, nullsFirst: false })
-        .order("name", { ascending: true });
-      if (error) console.error(error);
-      setDepartments((data as Department[]) || []);
+      const { data, error } = await supabase.from("departments").select("id,name").order("name");
+      if (!error) setDepartments(data || []);
     })();
   }, []);
 
-  const deptById = useMemo(() => {
-    const m = new Map<number, Department>();
-    departments.forEach((d) => m.set(d.id, d));
-    return m;
-  }, [departments]);
-
-  const deptLabel = (id?: number | null) => {
-    if (!id) return "-";
-    const d = deptById.get(id);
-    return d ? `${d.code ? d.code + " · " : ""}${d.name}` : String(id);
-  };
-
-  /* Devices */
   async function fetchDevices() {
     setLoading(true);
     try {
@@ -331,15 +265,13 @@ export default function InventoryPage() {
       if (filters.departmentId !== "all") q = q.eq("department_id", Number(filters.departmentId));
       if (filters.search.trim()) {
         const s = filters.search.trim();
-        q = q.or(
-          `asset_tag.ilike.%${s}%,serial_no.ilike.%${s}%,model.ilike.%${s}%,brand.ilike.%${s}%`
-        );
+        q = q.or(`asset_tag.ilike.%${s}%,serial_no.ilike.%${s}%,model.ilike.%${s}%`);
       }
       const { data, error } = await q;
       if (error) throw error;
       setDevices((data as Device[]) || []);
     } catch (err: any) {
-      toast.error("โหลดข้อมูลล้มเหลว", { description: err?.message ?? String(err) });
+      toast({ title: "โหลดข้อมูลล้มเหลว", description: err?.message ?? String(err) });
     } finally {
       setLoading(false);
     }
@@ -357,23 +289,18 @@ export default function InventoryPage() {
   function toggleOne(id: string) { setSelected((prev) => ({ ...prev, [id]: !prev[id] })); }
 
   async function handleExportCSV() {
-    const headers = ["asset_tag", "serial_no", "status", "model", "brand", "department_id", "department_code", "last_seen"];
-    const csv = toCSV(devices.map((d) => {
-      const dept = d.department_id ? deptById.get(d.department_id) : undefined;
-      return {
-        asset_tag: d.asset_tag,
-        serial_no: d.serial_no,
-        status: d.status,
-        model: d.model ?? "",
-        brand: d.brand ?? "",
-        department_id: d.department_id ?? "",
-        department_code: dept?.code ?? "",
-        last_seen: d.last_seen ?? "",
-      };
-    }), headers);
+    const headers = ["asset_tag", "serial_no", "status", "model", "brand", "department_id", "last_seen"];
+    const csv = toCSV(devices.map((d) => ({
+      asset_tag: d.asset_tag,
+      serial_no: d.serial_no,
+      status: d.status,
+      model: d.model ?? "",
+      brand: d.brand ?? "",
+      department_id: d.department_id ?? "",
+      last_seen: d.last_seen ?? "",
+    })), headers);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `devices_${Date.now()}.csv`; a.click(); URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `devices_${Date.now()}.csv`; a.click(); URL.revokeObjectURL(url);
   }
 
   async function handleDeleteSelected() {
@@ -382,10 +309,7 @@ export default function InventoryPage() {
     await supabase.from("devices").update({ deleted_at: new Date().toISOString() }).in("id", ids);
     setSelected({});
     fetchDevices();
-    toast.success("ลบรายการที่เลือกแล้ว");
   }
-
-  const [importPreview, setImportPreview] = useState<{ headers: string[]; rows: Record<string, string>[] } | null>(null);
 
   async function handleFilePick(f?: File) {
     const file = f ?? fileRef.current?.files?.[0];
@@ -394,83 +318,39 @@ export default function InventoryPage() {
     setImportPreview(preview);
   }
 
+  const [importPreview, setImportPreview] = useState<{ headers: string[]; rows: Record<string, string>[] } | null>(null);
   async function handleImportCommit() {
     if (!importPreview) return;
-
-    // Map department_code / department_name -> department_id
-    const codeMap = new Map<string, number>();
-    const nameMap = new Map<string, number>();
-    departments.forEach((d) => {
-      if (d.code) codeMap.set(d.code.toLowerCase(), d.id);
-      nameMap.set(d.name.toLowerCase(), d.id);
-    });
-
-    const mapped: Partial<Device>[] = importPreview.rows.map((r) => {
-      let department_id: number | null = null;
-
-      if (r["department_id"]) {
-        const n = Number(r["department_id"]);
-        department_id = Number.isFinite(n) ? n : null;
-      } else if (r["department_code"]) {
-        department_id = codeMap.get(String(r["department_code"]).toLowerCase()) ?? null;
-      } else if (r["department"] || r["department_name"]) {
-        const key = String(r["department"] ?? r["department_name"]).toLowerCase();
-        department_id = nameMap.get(key) ?? null;
-      }
-
-      return {
-        asset_tag: r["asset_tag"] ?? r["Asset Tag"] ?? r["asset"] ?? "",
-        serial_no: r["serial_no"] ?? r["Serial"] ?? r["serial"] ?? "",
-        status: ((r["status"] || "active").toLowerCase() as Status),
-        model: r["model"] ?? null,
-        brand: r["brand"] ?? null,
-        department_id,
-      };
-    }).filter((x) => x.asset_tag && x.serial_no);
-
-    if (!mapped.length) {
-      toast.error("ไฟล์ไม่ถูกต้อง", { description: "ต้องมี asset_tag และ serial_no" });
-      return;
-    }
-
-    try {
-      await upsertBatch(mapped);
-      setImportPreview(null);
-      fetchDevices();
-      toast.success(`นำเข้าแล้ว ${mapped.length} รายการ`);
-    } catch (err: any) {
-      toast.error("นำเข้าล้มเหลว", { description: err?.message ?? String(err) });
-    }
+    const mapped: Partial<Device>[] = importPreview.rows.map((r) => ({
+      asset_tag: r["asset_tag"] ?? r["Asset Tag"] ?? r["asset"] ?? "",
+      serial_no: r["serial_no"] ?? r["Serial"] ?? r["serial"] ?? "",
+      status: ((r["status"] || "active").toLowerCase() as Status),
+      model: r["model"] ?? null,
+      brand: r["brand"] ?? null,
+      department_id: r["department_id"] ? Number(r["department_id"]) : null,
+    })).filter((x) => x.asset_tag && x.serial_no);
+    if (!mapped.length) { toast({ title: "ไฟล์ไม่ถูกต้อง", description: "ต้องมี asset_tag และ serial_no" }); return; }
+    await upsertBatch(mapped);
+    setImportPreview(null);
+    fetchDevices();
+    toast({ title: "นำเข้าแล้ว", description: `${mapped.length} รายการ` });
   }
 
   async function handlePrintQR() {
     const picked = devices.filter((d) => selected[d.id]).map((d) => ({ id: d.id, asset_tag: d.asset_tag }));
     if (!picked.length) return;
-    try {
-      const QRCode: any = await import("qrcode"); // ต้องมีแพ็กเกจ qrcode
-      const items = await Promise.all(
-        picked.map(async (it) => ({
-          asset_tag: it.asset_tag,
-          dataUrl: await QRCode.toDataURL(it.asset_tag, { margin: 1, width: 256 }),
-        }))
-      );
-      const html = `<!doctype html><html><head><meta charset="utf-8" />
-        <style>@page{size:A4;margin:10mm}body{font-family:ui-sans-serif,system-ui}
-        .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-        .card{border:1px solid #ddd;padding:8px;text-align:center}
-        img{width:100%;height:auto}small{display:block;margin-top:6px}</style></head><body>
-        <div class="grid">${items.map((x) => `<div class="card"><img src="${x.dataUrl}" /><small>${x.asset_tag}</small></div>`).join("")}</div>
-        <script>onload=()=>print()</script></body></html>`;
-      const w = window.open("", "_blank"); if (!w) return; w.document.write(html); w.document.close();
-    } catch (err: any) {
-      toast.error("พิมพ์ QR ไม่สำเร็จ", { description: "ติดตั้งแพ็กเกจ 'qrcode' ก่อน (npm i qrcode)" });
-    }
+    const QRCode: any = await import("qrcode");
+    const items = await Promise.all(picked.map(async (it) => ({ asset_tag: it.asset_tag, dataUrl: await QRCode.toDataURL(it.asset_tag, { margin: 1, width: 256 }) })));
+    const html = `<!doctype html><html><head><meta charset="utf-8" />
+      <style>@page{size:A4;margin:10mm}body{font-family:ui-sans-serif,system-ui} .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{border:1px solid #ddd;padding:8px;text-align:center}img{width:100%;height:auto}small{display:block;margin-top:6px}</style></head><body>
+      <div class="grid">${items.map((x) => `<div class="card"><img src="${x.dataUrl}" /><small>${x.asset_tag}</small></div>`).join("")}</div>
+      <script>onload=()=>print()</script></body></html>`;
+    const w = window.open("", "_blank"); if (!w) return; w.document.write(html); w.document.close();
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <Toaster richColors position="top-right" />
-
+      <Toaster />
       {/* Topbar */}
       <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 py-4">
@@ -480,13 +360,11 @@ export default function InventoryPage() {
               <p className="text-sm text-slate-500">จัดการ/ค้นหา/นำเข้า-ส่งออก และพิมพ์ QR สำหรับอุปกรณ์</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => { setEditing(null); setDialogOpen(true); }}>
-                <Plus className="mr-2 h-4 w-4" />เพิ่มอุปกรณ์
-              </Button>
-              <Button variant="outline" onClick={fetchDevices}><RefreshCw className="mr-2 h-4 w-4" />รีเฟรช</Button>
-              <Button variant="outline" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" />ส่งออก CSV</Button>
-              <Button variant="outline" disabled={!anySelected} onClick={handlePrintQR}><QrCode className="mr-2 h-4 w-4" />พิมพ์ QR</Button>
-              <Button variant="destructive" disabled={!anySelected} onClick={handleDeleteSelected}><Trash2 className="mr-2 h-4 w-4" />ลบที่เลือก</Button>
+              <Button variant="outline" onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="mr-2 h-4 w-4"/>เพิ่มอุปกรณ์</Button>
+              <Button variant="outline" onClick={fetchDevices}><RefreshCw className="mr-2 h-4 w-4"/>รีเฟรช</Button>
+              <Button variant="outline" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4"/>ส่งออก CSV</Button>
+              <Button variant="outline" disabled={!anySelected} onClick={handlePrintQR}><QrCode className="mr-2 h-4 w-4"/>พิมพ์ QR</Button>
+              <Button variant="destructive" disabled={!anySelected} onClick={handleDeleteSelected}><Trash2 className="mr-2 h-4 w-4"/>ลบที่เลือก</Button>
             </div>
           </div>
         </div>
@@ -500,12 +378,7 @@ export default function InventoryPage() {
               <Label className="mb-1 block text-xs text-slate-600">ค้นหา</Label>
               <div className="relative">
                 <svg width="16" height="16" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg>
-                <Input
-                  value={filters.search}
-                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                  placeholder="asset_tag / serial / model / brand"
-                  className="pl-9"
-                />
+                <Input value={filters.search} onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))} placeholder="asset_tag / serial / model" className="pl-9" />
               </div>
             </div>
             <div>
@@ -528,7 +401,7 @@ export default function InventoryPage() {
                 <SelectContent>
                   <SelectItem value="all">ทั้งหมด</SelectItem>
                   {departments.map((d) => (
-                    <SelectItem key={d.id} value={String(d.id)}>{d.code ? `${d.code} · ${d.name}` : d.name}</SelectItem>
+                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -580,7 +453,7 @@ export default function InventoryPage() {
                   <th className="w-10 px-3 py-3 text-left">
                     <Checkbox checked={!!allSelected} onCheckedChange={toggleAll as any} />
                   </th>
-                  {["asset_tag", "serial_no", "status", "model", "brand", "department", "last_seen", "actions"].map((h) => (
+                  {["asset_tag", "serial_no", "status", "model", "brand", "department_id", "last_seen", "actions"].map((h) => (
                     <th key={h} className="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">{h}</th>
                   ))}
                 </tr>
@@ -615,13 +488,11 @@ export default function InventoryPage() {
                     <td className="border-t px-3 py-3"><StatusBadge value={d.status} /></td>
                     <td className="border-t px-3 py-3 text-slate-700">{d.model ?? "-"}</td>
                     <td className="border-t px-3 py-3 text-slate-700">{d.brand ?? "-"}</td>
-                    <td className="border-t px-3 py-3 text-slate-700">{deptLabel(d.department_id)}</td>
+                    <td className="border-t px-3 py-3 text-slate-700">{d.department_id ?? "-"}</td>
                     <td className="border-t px-3 py-3 text-slate-700">{d.last_seen ? new Date(d.last_seen).toLocaleString() : "-"}</td>
                     <td className="border-t px-3 py-2">
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { setEditing(d); setDialogOpen(true); }}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => { setEditing(d); setDialogOpen(true); }}><Pencil className="h-4 w-4"/></Button>
                       </div>
                     </td>
                   </tr>

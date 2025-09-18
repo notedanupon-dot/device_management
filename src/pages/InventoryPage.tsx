@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase"; // หรือ "../../lib/supabase"
 import { Plus, Pencil, Trash2, Download, RefreshCw, QrCode } from "lucide-react";
 // shadcn/ui
 import { Button } from "../components/ui/button";
@@ -10,11 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
 
-// ---------- Supabase ----------
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL as string,
-  import.meta.env.VITE_SUPABASE_ANON_KEY as string
-);
+
 
 // ---------- Types ----------
 export type Status = "active" | "in_repair" | "retired" | "lost";

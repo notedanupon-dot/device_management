@@ -184,7 +184,7 @@ function DeviceFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby="">
         <DialogHeader>
           <DialogTitle>{isEdit ? "แก้ไขอุปกรณ์" : "เพิ่มอุปกรณ์"}</DialogTitle>
         </DialogHeader>
@@ -210,21 +210,31 @@ function DeviceFormDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="department_id">แผนก</Label>
-              <Select
-                value={form.department_id ? String(form.department_id) : ""}
-                onValueChange={(v) => setForm((f) => ({ ...f, department_id: v ? Number(v) : undefined }))}
-              >
-                <SelectTrigger id="department_id"><SelectValue placeholder="เลือกแผนก" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">— ไม่ระบุ —</SelectItem>
-                  {departments.map((d) => (
-                    <SelectItem key={d.id} value={String(d.id)}>{labelOf(d)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            const NONE = "none";
+
+<div className="space-y-1.5">
+  <Label htmlFor="department_id">แผนก</Label>
+  <Select
+    value={form.department_id != null ? String(form.department_id) : NONE}
+    onValueChange={(v) =>
+      setForm((f) => ({ ...f, department_id: v === NONE ? undefined : Number(v) }))
+    }
+  >
+    <SelectTrigger id="department_id">
+      <SelectValue placeholder="เลือกแผนก" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value={NONE}>— ไม่ระบุ —</SelectItem>
+      {departments.map((d) => (
+        <SelectItem key={d.id} value={String(d.id)}>
+          {d.name}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+
+
             <div className="space-y-1.5">
               <Label htmlFor="model">Model</Label>
               <Input id="model" value={form.model || ""} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />

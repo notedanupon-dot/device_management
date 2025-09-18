@@ -11,6 +11,65 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { toast } from "sonner";
 
 
+// ====== ภายในฟังก์ชัน component InventoryPage ======
+const fileRef = React.useRef<HTMLInputElement | null>(null)
+const [importing, setImporting] = React.useState(false)
+
+// ตัวอย่าง mapping: คาด header = asset_tag, serial_no, status, model, brand, department_code, last_seen
+async function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  setImporting(true)
+  try {
+    const rows = await parseCSVFile(file)
+
+    // map เป็น payload สำหรับ Supabase
+    const payload = rows.map((r) => ({
+      asset_tag: r.asset_tag || r.asset || '',
+      serial_no: r.serial_no || '',
+      status: (r.status || 'active').toLowerCase() as 'active' | 'in_repair' | 'retired' | 'lost',
+      model: r.model || null,
+      brand: r.brand || null,
+      // ถ้ามี department_id โดยตรงให้ใช้เลย; ถ้ามีแต่รหัสแผนก (code) คุณอาจต้อง query กลับเพื่อหา id ก่อน
+      department_id: r.department_id ? Number(r.department_id) : null,
+      last_seen: r.last_seen ? new Date(r.last_seen).toISOString() : null,
+    }))
+
+    // อัปเซิร์ตเข้า Supabase (onConflict ตามคีย์ที่คุณต้องการ เช่น asset_tag)
+    const { error } = await supabase
+      .from('devices')
+      .upsert(payload, { onConflict: 'asset_tag' })
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'นำเข้าไม่สำเร็จ', description: error.message })
+    } else {
+      toast({ title: `นำเข้าแล้ว ${payload.length} รายการ` })
+      // รีเฟรชตารางหลังนำเข้า
+      fetchDevices()
+    }
+  } catch (err: any) {
+    toast({ variant: 'destructive', title: 'เกิดข้อผิดพลาด', description: String(err?.message || err) })
+  } finally {
+    setImporting(false)
+    if (e.target) e.target.value = '' // reset file input
+  }
+}
+
+{/* ปุ่มใน toolbar ด้านบน */}
+<Button variant="secondary" onClick={() => fileRef.current?.click()} disabled={importing}>
+  นำเข้า CSV
+</Button>
+
+{/* file input ซ่อนไว้ */}
+<input
+  ref={fileRef}
+  type="file"
+  accept=".csv,text/csv"
+  className="hidden"
+  onChange={handleImportCSV}
+/>
+
+
 
 // ---------- Types ----------
 export type Status = "active" | "in_repair" | "retired" | "lost";
@@ -178,6 +237,66 @@ function DeviceFormDialog({
     </Dialog>
   );
 }
+
+// ===== CSV utils (วางไว้ด้านบนไฟล์ InventoryPage.tsx ก่อน export default) =====
+
+/** แปลง text CSV -> array of object โดยอิง header แถวแรก (รองรับ "ค่า,มี,คอมมา" แบบใส่เครื่องหมายคำพูด) */
+function parseCSV(text: string): Array<Record<string, string>> {
+  const rows: string[][] = []
+  let cur = ''
+  let row: string[] = []
+  let inQuotes = false
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (c === '"') {
+      // ดูว่ามี "" (escaped quote) ไหม
+      if (inQuotes && text[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (c === ',' && !inQuotes) {
+      row.push(cur)
+      cur = ''
+    } else if ((c === '\n' || c === '\r') && !inQuotes) {
+      // ปิดแถว (รองรับ \r\n)
+      if (c === '\r' && text[i + 1] === '\n') i++
+      row.push(cur)
+      rows.push(row)
+      row = []
+      cur = ''
+    } else {
+      cur += c
+    }
+  }
+  // ค่าคอลัมน์สุดท้ายของไฟล์
+  if (cur.length > 0 || row.length > 0) {
+    row.push(cur)
+    rows.push(row)
+  }
+
+  if (rows.length === 0) return []
+
+  const headers = rows[0].map(h => h.trim())
+  const dataRows = rows.slice(1)
+
+  return dataRows
+    .filter(r => r.some(cell => cell.trim() !== '')) // ตัดแถวว่าง
+    .map(r => {
+      const obj: Record<string, string> = {}
+      headers.forEach((h, idx) => (obj[h] = (r[idx] ?? '').trim()))
+      return obj
+    })
+}
+
+/** อ่านไฟล์ CSV ที่เลือกจาก input[type=file] */
+async function parseCSVFile(file: File): Promise<Array<Record<string, string>>> {
+  const text = await file.text()
+  return parseCSV(text)
+}
+
 
 // ---------- Main Page ----------
 export default function InventoryPage() {

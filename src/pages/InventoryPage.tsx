@@ -2,15 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Plus, Pencil, Trash2, Download, RefreshCw, QrCode, UploadCloud, Search } from "lucide-react";
 
-// shadcn/ui
+// ใช้เฉพาะคอมโพเนนต์ที่มีอยู่จริงในโปรเจกต์
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 
 // ---------- Types ----------
@@ -452,216 +450,199 @@ export default function InventoryPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 pb-24">
-        {/* Summary */}
+        {/* Summary (แทน Card/Badge ด้วย div ธรรมดา) */}
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">จำนวนอุปกรณ์ทั้งหมด</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-2xl font-semibold">{devices.length.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">ที่เลือกไว้</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-2xl font-semibold">{selectedCount.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">สถานะตัวกรอง</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2 pt-0">
-              <Badge variant="secondary" className="rounded-full">status: {filters.status}</Badge>
-              <Badge variant="secondary" className="rounded-full">
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="text-sm font-medium text-slate-600">จำนวนอุปกรณ์ทั้งหมด</div>
+            <div className="mt-1 text-2xl font-semibold">{devices.length.toLocaleString()}</div>
+          </div>
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="text-sm font-medium text-slate-600">ที่เลือกไว้</div>
+            <div className="mt-1 text-2xl font-semibold">{selectedCount.toLocaleString()}</div>
+          </div>
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="text-sm font-medium text-slate-600">สถานะตัวกรอง</div>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5">status: {filters.status}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5">
                 dept: {filters.departmentId === "all" ? "ทั้งหมด" : filters.departmentId}
-              </Badge>
-              {filters.search && <Badge className="rounded-full">ค้นหา: “{filters.search}”</Badge>}
-            </CardContent>
-          </Card>
+              </span>
+              {filters.search && <span className="rounded-full bg-indigo-100 px-2 py-0.5">ค้นหา: “{filters.search}”</span>}
+            </div>
+          </div>
         </div>
 
         {/* Filters + Import */}
-        <Card className="mt-6 shadow-sm">
-          <CardContent className="pt-6">
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="md:col-span-2">
-                <Label className="mb-1 block text-xs text-slate-600">ค้นหา</Label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    value={filters.search}
-                    onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                    placeholder="asset_tag / serial / model"
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs text-slate-600">สถานะ</Label>
-                <Select value={filters.status} onValueChange={(v) => setFilters((f) => ({ ...f, status: v as any }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="ทั้งหมด" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทั้งหมด</SelectItem>
-                    <SelectItem value="active">active</SelectItem>
-                    <SelectItem value="in_repair">in_repair</SelectItem>
-                    <SelectItem value="retired">retired</SelectItem>
-                    <SelectItem value="lost">lost</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs text-slate-600">แผนก</Label>
-                <Select value={filters.departmentId} onValueChange={(v) => setFilters((f) => ({ ...f, departmentId: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="ทั้งหมด" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทั้งหมด</SelectItem>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={String(d.id)}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Import */}
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 hover:bg-slate-100 md:w-auto">
-                <UploadCloud className="h-4 w-4" />
-                <span>เลือกไฟล์ CSV เพื่อพรีวิว</span>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={(e) => handleFilePick(e.target.files?.[0] || undefined)}
+        <div className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="md:col-span-2">
+              <Label className="mb-1 block text-xs text-slate-600">ค้นหา</Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={filters.search}
+                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                  placeholder="asset_tag / serial / model"
+                  className="pl-9"
                 />
-              </label>
-              <Button variant="secondary" disabled={!importPreview} onClick={handleImportCommit}>
-                บันทึกนำเข้า
-              </Button>
-            </div>
-
-            {importPreview && (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="mb-2 text-sm font-medium text-slate-600">พรีวิว {importPreview.rows.length} แถว</div>
-                <div className="max-h-60 overflow-auto rounded-lg border bg-white">
-                  <table className="min-w-full text-xs">
-                    <thead className="sticky top-0 bg-slate-50">
-                      <tr>
-                        {importPreview.headers.map((h) => (
-                          <th key={h} className="whitespace-nowrap px-2 py-2 text-left font-semibold text-slate-600">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {importPreview.rows.slice(0, 20).map((r, idx) => (
-                        <tr key={idx} className="odd:bg-white even:bg-slate-50/40">
-                          {importPreview.headers.map((h) => (
-                            <td key={h} className="whitespace-nowrap px-2 py-1.5 text-slate-700">
-                              {r[h]}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Table */}
-        <Card className="mt-6 overflow-hidden shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-slate-50/60 py-3">
-            <CardTitle className="text-base font-semibold">รายการอุปกรณ์</CardTitle>
-            <div className="text-xs text-slate-500">
-              แสดง {devices.length.toLocaleString()} รายการ | เลือก {selectedCount.toLocaleString()} รายการ
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="sticky top-[72px] z-[1] bg-white/95 backdrop-blur">
-                  <tr className="border-b">
-                    <th className="w-10 px-3 py-3 text-left">
-                      <Checkbox checked={!!allSelected} onCheckedChange={toggleAll as any} />
-                    </th>
-                    {["asset_tag", "serial_no", "status", "model", "brand", "department_id", "last_seen", "actions"].map((h) => (
-                      <th
-                        key={h}
-                        className="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading &&
-                    Array.from({ length: 6 }).map((_, i) => (
-                      <tr key={i} className="animate-pulse">
-                        <td className="border-b px-3 py-3">
-                          <div className="h-4 w-4 rounded bg-slate-200" />
-                        </td>
-                        {Array.from({ length: 8 }).map((__, j) => (
-                          <td key={j} className="border-b px-3 py-3">
-                            <div className="h-4 w-28 rounded bg-slate-200" />
+            <div>
+              <Label className="mb-1 block text-xs text-slate-600">สถานะ</Label>
+              <Select value={filters.status} onValueChange={(v) => setFilters((f) => ({ ...f, status: v as any }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="ทั้งหมด" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  <SelectItem value="active">active</SelectItem>
+                  <SelectItem value="in_repair">in_repair</SelectItem>
+                  <SelectItem value="retired">retired</SelectItem>
+                  <SelectItem value="lost">lost</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs text-slate-600">แผนก</Label>
+              <Select value={filters.departmentId} onValueChange={(v) => setFilters((f) => ({ ...f, departmentId: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="ทั้งหมด" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Import */}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 hover:bg-slate-100 md:w-auto">
+              <UploadCloud className="h-4 w-4" />
+              <span>เลือกไฟล์ CSV เพื่อพรีวิว</span>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => handleFilePick(e.target.files?.[0] || undefined)}
+              />
+            </label>
+            <Button variant="secondary" disabled={!importPreview} onClick={handleImportCommit}>
+              บันทึกนำเข้า
+            </Button>
+          </div>
+
+          {importPreview && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-2 text-sm font-medium text-slate-600">พรีวิว {importPreview.rows.length} แถว</div>
+              <div className="max-h-60 overflow-auto rounded-lg border bg-white">
+                <table className="min-w-full text-xs">
+                  <thead className="sticky top-0 bg-slate-50">
+                    <tr>
+                      {importPreview.headers.map((h) => (
+                        <th key={h} className="whitespace-nowrap px-2 py-2 text-left font-semibold text-slate-600">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importPreview.rows.slice(0, 20).map((r, idx) => (
+                      <tr key={idx} className="odd:bg-white even:bg-slate-50/40">
+                        {importPreview.headers.map((h) => (
+                          <td key={h} className="whitespace-nowrap px-2 py-1.5 text-slate-700">
+                            {r[h]}
                           </td>
                         ))}
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
 
-                  {!loading && devices.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="px-6 py-16 text-center">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-slate-300">
-                          <Search className="h-6 w-6 text-slate-400" />
-                        </div>
-                        <div className="mt-3 text-base font-medium text-slate-700">ไม่พบข้อมูล</div>
-                        <div className="text-xs text-slate-500">ลองปรับตัวกรองหรือกดรีเฟรช</div>
+        {/* Table */}
+        <div className="mt-6 overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b bg-slate-50/60 px-4 py-3">
+            <div className="text-base font-semibold">รายการอุปกรณ์</div>
+            <div className="text-xs text-slate-500">
+              แสดง {devices.length.toLocaleString()} รายการ | เลือก {selectedCount.toLocaleString()} รายการ
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-[72px] z-[1] bg-white/95 backdrop-blur">
+                <tr className="border-b">
+                  <th className="w-10 px-3 py-3 text-left">
+                    <Checkbox checked={!!allSelected} onCheckedChange={toggleAll as any} />
+                  </th>
+                  {["asset_tag", "serial_no", "status", "model", "brand", "department_id", "last_seen", "actions"].map((h) => (
+                    <th key={h} className="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loading &&
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="border-b px-3 py-3">
+                        <div className="h-4 w-4 rounded bg-slate-200" />
                       </td>
-                    </tr>
-                  )}
-
-                  {devices.map((d) => (
-                    <tr key={d.id} className="border-b odd:bg-white even:bg-slate-50/40 hover:bg-violet-50/40">
-                      <td className="px-3 py-3">
-                        <Checkbox checked={!!selected[d.id]} onCheckedChange={() => toggleOne(d.id)} />
-                      </td>
-                      <td className="px-3 py-3 font-medium text-slate-800">{d.asset_tag}</td>
-                      <td className="px-3 py-3 text-slate-700">{d.serial_no}</td>
-                      <td className="px-3 py-3"><StatusBadge value={d.status} /></td>
-                      <td className="px-3 py-3 text-slate-700">{d.model ?? "-"}</td>
-                      <td className="px-3 py-3 text-slate-700">{d.brand ?? "-"}</td>
-                      <td className="px-3 py-3 text-slate-700">{d.department_id ?? "-"}</td>
-                      <td className="px-3 py-3 text-slate-700">{d.last_seen ? new Date(d.last_seen).toLocaleString() : "-"}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => { setEditing(d); setDialogOpen(true); }}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
+                      {Array.from({ length: 8 }).map((__, j) => (
+                        <td key={j} className="border-b px-3 py-3">
+                          <div className="h-4 w-28 rounded bg-slate-200" />
+                        </td>
+                      ))}
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+
+                {!loading && devices.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-16 text-center">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-slate-300">
+                        <Search className="h-6 w-6 text-slate-400" />
+                      </div>
+                      <div className="mt-3 text-base font-medium text-slate-700">ไม่พบข้อมูล</div>
+                      <div className="text-xs text-slate-500">ลองปรับตัวกรองหรือกดรีเฟรช</div>
+                    </td>
+                  </tr>
+                )}
+
+                {devices.map((d) => (
+                  <tr key={d.id} className="border-b odd:bg-white even:bg-slate-50/40 hover:bg-violet-50/40">
+                    <td className="px-3 py-3">
+                      <Checkbox checked={!!selected[d.id]} onCheckedChange={() => toggleOne(d.id)} />
+                    </td>
+                    <td className="px-3 py-3 font-medium text-slate-800">{d.asset_tag}</td>
+                    <td className="px-3 py-3 text-slate-700">{d.serial_no}</td>
+                    <td className="px-3 py-3"><StatusBadge value={d.status} /></td>
+                    <td className="px-3 py-3 text-slate-700">{d.model ?? "-"}</td>
+                    <td className="px-3 py-3 text-slate-700">{d.brand ?? "-"}</td>
+                    <td className="px-3 py-3 text-slate-700">{d.department_id ?? "-"}</td>
+                    <td className="px-3 py-3 text-slate-700">{d.last_seen ? new Date(d.last_seen).toLocaleString() : "-"}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => { setEditing(d); setDialogOpen(true); }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </main>
 
       {/* Add/Edit Dialog */}

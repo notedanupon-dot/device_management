@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase"; // หรือ "../../lib/supabase"
 import { Plus, Pencil, Trash2, Download, RefreshCw, QrCode } from "lucide-react";
 // shadcn/ui
@@ -12,8 +12,8 @@ import { toast } from "sonner";
 
 
 // ====== ภายในฟังก์ชัน component InventoryPage ======
-const fileRef = React.useRef<HTMLInputElement | null>(null)
-const [importing, setImporting] = React.useState(false)
+const fileRef = useRef<HTMLInputElement | null>(null)
+const [importing, setImporting] = useState(false)
 
 // ตัวอย่าง mapping: คาด header = asset_tag, serial_no, status, model, brand, department_code, last_seen
 async function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {

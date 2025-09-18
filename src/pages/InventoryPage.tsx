@@ -8,8 +8,7 @@ import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { useToast } from "../components/ui/use-toast";
-import { Toaster } from "../components/ui/toaster";
+import { toast } from "sonner";
 
 // ---------- Supabase ----------
 const supabase = createClient(
@@ -34,68 +33,14 @@ export type Device = {
 export type Department = { id: number; name: string };
 
 // ---------- Helpers ----------
-const cx = (...xs: Array<string | false | undefined | null>) => xs.filter(Boolean).join(" ");
+// ✅ ใช้ตัวนี้แทนของเดิม
+const csvEscape = (v: unknown) => {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  // ครอบกรณีมีเครื่องหมายคำพูด , หรือขึ้นบรรทัดใหม่
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
 
-function StatusBadge({ value }: { value: Status }) {
-  const map: Record<Status, string> = {
-    active: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200",
-    in_repair: "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
-    retired: "bg-slate-200 text-slate-700 ring-1 ring-slate-300",
-    lost: "bg-rose-100 text-rose-700 ring-1 ring-rose-200",
-  };
-  return <span className={cx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", map[value])}>{value}</span>;
-}
-
-function toCSV(rows: Record<string, unknown>[], headers?: string[]) {
-  if (!rows?.length) return "";
-  const cols = headers ?? Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
-  const esc = (v: unknown) => {
-    if (v === null || v === undefined) return "";
-    const s = String(v);
-    return /[",
-]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  };
-  return [cols.join(","), ...rows.map((r) => cols.map((c) => esc((r as any)[c])).join(","))].join("
-");
-}
-
-async function parseCSVFile(file: File): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
-  const text = await file.text();
-  const rows: string[][] = [];
-  let i = 0, cur = "", inQ = false, row: string[] = [];
-  const pushCell = () => { row.push(cur); cur = ""; };
-  const pushRow = () => { rows.push(row); row = []; };
-  while (i < text.length) {
-    const ch = text[i];
-    if (inQ) {
-      if (ch === '"') { if (text[i+1] === '"') { cur += '"'; i++; } else inQ = false; }
-      else cur += ch;
-    } else {
-      if (ch === '"') inQ = true;
-      else if (ch === ',') pushCell();
-      else if (ch === '
-') { pushCell(); pushRow(); }
-      else if (ch !== '
-') cur += ch;
-    }
-    i++;
-  }
-  if (cur.length || row.length) { pushCell(); pushRow(); }
-  if (!rows.length) return { headers: [], rows: [] };
-  const headers = rows[0].map((h) => h.trim());
-  const data = rows.slice(1)
-    .filter((r) => r.some((c) => c && c.trim().length))
-    .map((r) => { const o: Record<string, string> = {}; headers.forEach((h, idx) => (o[h] = r[idx] ?? "")); return o; });
-  return { headers, rows: data };
-}
-
-async function upsertBatch(devs: Partial<Device>[]) {
-  for (let i = 0; i < devs.length; i += 500) {
-    const slice = devs.slice(i, i + 500);
-    const { error } = await supabase.from("devices").upsert(slice);
-    if (error) throw error;
-  }
-}
 
 // ---------- Device Form Dialog ----------
 function DeviceFormDialog({
@@ -111,7 +56,7 @@ function DeviceFormDialog({
   onSaved: () => void;
   departments: Department[];
 }) {
-  const { toast } = useToast();
+  
   const [saving, setSaving] = useState(false);
   const isEdit = Boolean(initial?.id);
 
@@ -240,7 +185,7 @@ function DeviceFormDialog({
 
 // ---------- Main Page ----------
 export default function InventoryPage() {
-  const { toast } = useToast();
+ 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -289,18 +234,22 @@ export default function InventoryPage() {
   function toggleOne(id: string) { setSelected((prev) => ({ ...prev, [id]: !prev[id] })); }
 
   async function handleExportCSV() {
-    const headers = ["asset_tag", "serial_no", "status", "model", "brand", "department_id", "last_seen"];
-    const csv = toCSV(devices.map((d) => ({
-      asset_tag: d.asset_tag,
-      serial_no: d.serial_no,
-      status: d.status,
-      model: d.model ?? "",
-      brand: d.brand ?? "",
-      department_id: d.department_id ?? "",
-      last_seen: d.last_seen ?? "",
-    })), headers);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `devices_${Date.now()}.csv`; a.click(); URL.revokeObjectURL(url);
+    const headers = ["asset_tag","serial_no","status","model","brand","department","last_seen"];
+const lines = [
+  headers.join(","),
+  ...rows.map(r =>
+    [
+      csvEscape(r.asset_tag),
+      csvEscape(r.serial_no),
+      csvEscape(r.status),
+      csvEscape(r.model ?? ""),
+      csvEscape(r.brand ?? ""),
+      csvEscape(r.department_name ?? ""),
+      csvEscape(r.last_seen ?? "")
+    ].join(",")
+  ),
+];
+const csv = lines.join("\n");
   }
 
   async function handleDeleteSelected() {
@@ -350,7 +299,7 @@ export default function InventoryPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <Toaster />
+     
       {/* Topbar */}
       <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 py-4">

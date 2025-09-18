@@ -103,6 +103,7 @@ async function upsertBatch(devs: Partial<Device>[]) {
 }
 
 /* ==================== Device Form Dialog =================== */
+
 function DeviceFormDialog({
   open,
   onOpenChange,
@@ -116,8 +117,9 @@ function DeviceFormDialog({
   onSaved: () => void;
   departments: Department[];
 }) {
-  const isEdit = Boolean(initial?.id);
+  const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(initial?.id);
 
   const [form, setForm] = useState<Partial<Device>>({
     asset_tag: initial?.asset_tag ?? "",
@@ -211,6 +213,26 @@ function DeviceFormDialog({
               </Select>
             </div>
             const NONE = "none";
+
+            const [form, setForm] = useState<Partial<Device>>({
+    asset_tag: initial?.asset_tag ?? "",
+    serial_no: initial?.serial_no ?? "",
+    status: (initial?.status ?? "active") as Status,
+    model: initial?.model ?? "",
+    brand: initial?.brand ?? "",
+    department_id: initial?.department_id ?? undefined,
+  });
+
+  useEffect(() => {
+    setForm({
+      asset_tag: initial?.asset_tag ?? "",
+      serial_no: initial?.serial_no ?? "",
+      status: (initial?.status ?? "active") as Status,
+      model: initial?.model ?? "",
+      brand: initial?.brand ?? "",
+      department_id: initial?.department_id ?? undefined,
+    });
+  }, [initial]);
 
 <div className="space-y-1.5">
   <Label htmlFor="department_id">แผนก</Label>

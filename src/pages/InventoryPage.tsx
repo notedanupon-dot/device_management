@@ -25,6 +25,7 @@ export type Device = {
   brand?: string | null;
   status: Status;
   last_seen?: string | null;
+  purchase_date?: string | null;
   department_id?: number | null;
   deleted_at?: string | null;
 };
@@ -317,7 +318,7 @@ export default function InventoryPage() {
 
   /* ====== Export CSV ====== */
   async function handleExportCSV() {
-    const headers = ["asset_tag", "serial_no", "status", "model", "brand", "department", "last_seen"];
+    const headers = ["asset_tag", "serial_no", "status", "model", "brand", "department", "purchase_date"];
     const lines = [
       headers.join(","),
       ...devices.map((r) =>
@@ -328,7 +329,7 @@ export default function InventoryPage() {
           csvEscape(r.model ?? ""),
           csvEscape(r.brand ?? ""),
           csvEscape(r.department_id ? deptMap[r.department_id] ?? "" : ""),
-          csvEscape(r.last_seen ?? ""),
+          csvEscape(r.purchase_date ?? ""),
         ].join(",")
       ),
     ];
@@ -640,7 +641,7 @@ export default function InventoryPage() {
                   <th className="w-10 px-3 py-3 text-left">
                     <Checkbox checked={!!allSelected} onCheckedChange={toggleAll as any} />
                   </th>
-                  {["asset_tag","serial_no","status","model","brand","department","last_seen","actions"].map(h=> (
+                  {["asset_tag","serial_no","status","model","brand","department","purchase_date","actions"].map(h=> (
 
                     <th key={h} className="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                       {h}
@@ -686,7 +687,7 @@ export default function InventoryPage() {
                     <td className="px-3 py-3 text-slate-700">{d.model ?? "-"}</td>
                     <td className="px-3 py-3 text-slate-700">{d.brand ?? "-"}</td>
                     <td className="px-3 py-3 text-slate-700">{d.department_id ? (deptMap[d.department_id] ?? String(d.department_id)) : "-"}</td>
-                    <td className="px-3 py-3 text-slate-700">{d.last_seen ? new Date(d.last_seen).toLocaleString() : "-"}</td>
+                    <td className="px-3 py-3 text-slate-700">{d.purchase_date ? new Date(d.purchase_date).toLocaleDateString() : "-"}</td>
                     <td className="px-3 py-2">
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => { setEditing(d); setDialogOpen(true); }} className="border-blue-200 text-blue-700 hover:bg-blue-50">

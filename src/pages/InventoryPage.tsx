@@ -630,9 +630,9 @@ export default function InventoryPage() {
               แสดง {devices.length.toLocaleString()} รายการ | เลือก {selectedCount.toLocaleString()} รายการ
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="sticky top-[72px] z-[1] bg-white/95 backdrop-blur">
+          <div className="overflow-x-auto relative">
+  <table className="min-w-full text-sm">
+    <thead className="sticky top-0 z-10 bg-white">
                 <tr className="border-b">
                   <th className="w-10 px-3 py-3 text-left">
                     <Checkbox checked={!!allSelected} onCheckedChange={toggleAll as any} />

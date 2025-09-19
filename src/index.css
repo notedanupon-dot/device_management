@@ -14,7 +14,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+/* optional: ปรับโทนเล็กน้อย */
+:root { color-scheme: light; }
 /* Fallback: จะเห็นเปลี่ยนทันทีแม้ Tailwind ยังไม่ทำงาน */
 body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:#f8fafc; }
 

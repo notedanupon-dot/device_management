@@ -2,6 +2,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import "./index.css";  // นำเข้าไฟล์ CSS หลัก
 
 function ensureRoot(): HTMLElement {
   let el = document.getElementById("root");

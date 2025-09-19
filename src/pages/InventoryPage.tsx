@@ -1,8 +1,11 @@
+// src/pages/InventoryPage.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Plus, Pencil, Trash2, Download, RefreshCw, QrCode, UploadCloud, Search } from "lucide-react";
+import {
+  Plus, Pencil, Trash2, Download, RefreshCw, QrCode, UploadCloud, Search
+} from "lucide-react";
 
-// ใช้เฉพาะคอมโพเนนต์ที่มีอยู่จริงในโปรเจกต์
+// ใช้เฉพาะคอมโพเนนต์ที่โปรเจกต์มีอยู่จริง
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -11,7 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { toast } from "sonner";
 
-// ---------- Types ----------
+/* ================= types ================= */
 export type Status = "active" | "in_repair" | "retired" | "lost";
 export type Device = {
   id: string;
@@ -27,7 +30,9 @@ export type Device = {
 };
 export type Department = { id: number; name: string };
 
-// ---------- Helpers ----------
+/* ================= helpers ================= */
+const LOGO_SRC = "/muto-logo.png"; // วางไฟล์ไว้ที่ public/muto-logo.png
+
 const csvEscape = (v: unknown) => {
   if (v === null || v === undefined) return "";
   const s = String(v);
@@ -37,7 +42,7 @@ const csvEscape = (v: unknown) => {
 function StatusBadge({ value }: { value: Status }) {
   const color =
     value === "active"
-      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+      ? "bg-blue-100 text-blue-700 border-blue-200"
       : value === "in_repair"
       ? "bg-amber-100 text-amber-700 border-amber-200"
       : value === "retired"
@@ -50,37 +55,27 @@ function StatusBadge({ value }: { value: Status }) {
   );
 }
 
-// ===== CSV utils =====
+/* ============== CSV utils ============== */
 type CSVPreview = { headers: string[]; rows: Record<string, string>[] };
 
 function parseCSV(text: string): CSVPreview {
   const rows: string[][] = [];
-  let cur = "";
-  let row: string[] = [];
+  let cur = "", row: string[] = [];
   let inQuotes = false;
 
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (c === '"') {
-      if (inQuotes && text[i + 1] === '"') {
-        cur += '"';
-        i++;
-      } else inQuotes = !inQuotes;
+      if (inQuotes && text[i + 1] === '"') { cur += '"'; i++; }
+      else inQuotes = !inQuotes;
     } else if (c === "," && !inQuotes) {
-      row.push(cur);
-      cur = "";
+      row.push(cur); cur = "";
     } else if ((c === "\n" || c === "\r") && !inQuotes) {
       if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(cur);
-      rows.push(row);
-      row = [];
-      cur = "";
+      row.push(cur); rows.push(row); row = []; cur = "";
     } else cur += c;
   }
-  if (cur.length > 0 || row.length > 0) {
-    row.push(cur);
-    rows.push(row);
-  }
+  if (cur.length > 0 || row.length > 0) { row.push(cur); rows.push(row); }
   if (!rows.length) return { headers: [], rows: [] };
 
   const headers = rows[0].map((h) => h.trim());
@@ -105,13 +100,9 @@ async function upsertBatch(items: Partial<Device>[]) {
   if (error) throw error;
 }
 
-// ---------- Device Form Dialog ----------
+/* ============== Device form dialog ============== */
 function DeviceFormDialog({
-  open,
-  onOpenChange,
-  initial,
-  onSaved,
-  departments,
+  open, onOpenChange, initial, onSaved, departments,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -145,7 +136,7 @@ function DeviceFormDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.asset_tag || !form.serial_no) {
-      toast({ title: "กรอกข้อมูลไม่ครบ", description: "ต้องมี Asset Tag และ Serial No." });
+      toast("ต้องมี Asset Tag และ Serial No.");
       return;
     }
     try {
@@ -163,7 +154,7 @@ function DeviceFormDialog({
           })
           .eq("id", initial.id);
         if (error) throw error;
-        toast({ title: "บันทึกแล้ว", description: `อัปเดต ${form.asset_tag}` });
+        toast.success(`อัปเดต ${form.asset_tag}`);
       } else {
         const { error } = await supabase.from("devices").insert({
           asset_tag: form.asset_tag!,
@@ -174,12 +165,12 @@ function DeviceFormDialog({
           department_id: form.department_id ?? null,
         });
         if (error) throw error;
-        toast({ title: "เพิ่มอุปกรณ์แล้ว", description: form.asset_tag });
+        toast.success(`เพิ่มอุปกรณ์ ${form.asset_tag}`);
       }
       onOpenChange(false);
       onSaved();
     } catch (err: any) {
-      toast({ title: "บันทึกล้มเหลว", description: err?.message ?? String(err) });
+      toast.error(err?.message ?? String(err));
     } finally {
       setSaving(false);
     }
@@ -249,7 +240,7 @@ function DeviceFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               ยกเลิก
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={saving}>
               {saving ? "กำลังบันทึก..." : isEdit ? "บันทึก" : "เพิ่ม"}
             </Button>
           </DialogFooter>
@@ -259,7 +250,7 @@ function DeviceFormDialog({
   );
 }
 
-// ---------- Main Page ----------
+/* ============== main page ============== */
 export default function InventoryPage() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -301,7 +292,7 @@ export default function InventoryPage() {
       if (error) throw error;
       setDevices((data as Device[]) || []);
     } catch (err: any) {
-      toast({ title: "โหลดข้อมูลล้มเหลว", description: err?.message ?? String(err) });
+      toast.error(err?.message ?? String(err));
     } finally {
       setLoading(false);
     }
@@ -324,7 +315,7 @@ export default function InventoryPage() {
     setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  // ---------- Export CSV ----------
+  /* ====== Export CSV ====== */
   async function handleExportCSV() {
     const headers = ["asset_tag", "serial_no", "status", "model", "brand", "department", "last_seen"];
     const lines = [
@@ -351,7 +342,7 @@ export default function InventoryPage() {
     URL.revokeObjectURL(url);
   }
 
-  // ---------- Import CSV ----------
+  /* ====== Import CSV ====== */
   const [importPreview, setImportPreview] = useState<CSVPreview | null>(null);
 
   async function handleFilePick(f?: File) {
@@ -359,7 +350,7 @@ export default function InventoryPage() {
     if (!file) return;
     const preview = await parseCSVFile(file);
     setImportPreview(preview);
-    toast({ title: "โหลดไฟล์แล้ว", description: `พรีวิว ${preview.rows.length} แถว` });
+    toast(`พรีวิว ${preview.rows.length} แถว`);
   }
 
   async function handleImportCommit() {
@@ -377,20 +368,20 @@ export default function InventoryPage() {
       .filter((x) => x.asset_tag && x.serial_no);
 
     if (!mapped.length) {
-      toast({ title: "ไฟล์ไม่ถูกต้อง", description: "ต้องมี asset_tag และ serial_no" });
+      toast.error("ไฟล์ไม่ถูกต้อง: ต้องมี asset_tag และ serial_no");
       return;
     }
     try {
       await upsertBatch(mapped);
       setImportPreview(null);
       fetchDevices();
-      toast({ title: "นำเข้าแล้ว", description: `${mapped.length} รายการ` });
+      toast.success(`นำเข้าแล้ว ${mapped.length} รายการ`);
     } catch (err: any) {
-      toast({ title: "นำเข้าล้มเหลว", description: err?.message ?? String(err) });
+      toast.error(err?.message ?? String(err));
     }
   }
 
-  // ---------- QR Print ----------
+  /* ====== QR Print ====== */
   async function handlePrintQR() {
     const picked = devices.filter((d) => selected[d.id]).map((d) => ({ id: d.id, asset_tag: d.asset_tag }));
     if (!picked.length) return;
@@ -409,88 +400,90 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50/50 to-white">
       {/* Topbar */}
-      <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 py-4">
-          <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-3">
+            <img src={LOGO_SRC} alt="MUTO" className="h-8 w-auto" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inventory</h1>
               <p className="text-sm text-slate-500">จัดการ/ค้นหา/นำเข้า-ส่งออก และพิมพ์ QR สำหรับอุปกรณ์</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => { setEditing(null); setDialogOpen(true); }}>
-                <Plus className="mr-2 h-4 w-4" />เพิ่มอุปกรณ์
-              </Button>
-              <Button variant="outline" onClick={fetchDevices}>
-                <RefreshCw className="mr-2 h-4 w-4" />รีเฟรช
-              </Button>
-              <Button variant="outline" onClick={handleExportCSV}>
-                <Download className="mr-2 h-4 w-4" />ส่งออก CSV
-              </Button>
-              <Button variant="outline" disabled={!anySelected} onClick={handlePrintQR}>
-                <QrCode className="mr-2 h-4 w-4" />พิมพ์ QR
-              </Button>
-              <Button
-                variant="destructive"
-                disabled={!anySelected}
-                onClick={async () => {
-                  const ids = Object.keys(selected).filter((k) => selected[k]);
-                  if (!ids.length) return;
-                  await supabase.from("devices").update({ deleted_at: new Date().toISOString() }).in("id", ids);
-                  setSelected({});
-                  fetchDevices();
-                }}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />ลบที่เลือก
-              </Button>
-            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={() => { setEditing(null); setDialogOpen(true); }} className="border-blue-200 text-blue-700 hover:bg-blue-50">
+              <Plus className="mr-2 h-4 w-4" />เพิ่มอุปกรณ์
+            </Button>
+            <Button variant="outline" onClick={fetchDevices} className="border-blue-200 text-blue-700 hover:bg-blue-50">
+              <RefreshCw className="mr-2 h-4 w-4" />รีเฟรช
+            </Button>
+            <Button variant="outline" onClick={handleExportCSV} className="border-blue-200 text-blue-700 hover:bg-blue-50">
+              <Download className="mr-2 h-4 w-4" />ส่งออก CSV
+            </Button>
+            <Button variant="outline" disabled={!anySelected} onClick={handlePrintQR} className="border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-40">
+              <QrCode className="mr-2 h-4 w-4" />พิมพ์ QR
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!anySelected}
+              onClick={async () => {
+                const ids = Object.keys(selected).filter((k) => selected[k]);
+                if (!ids.length) return;
+                await supabase.from("devices").update({ deleted_at: new Date().toISOString() }).in("id", ids);
+                setSelected({});
+                fetchDevices();
+              }}
+              className="bg-rose-600 hover:bg-rose-700 disabled:opacity-40"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />ลบที่เลือก
+            </Button>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 pb-24">
-        {/* Summary (แทน Card/Badge ด้วย div ธรรมดา) */}
+        {/* Summary */}
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="text-sm font-medium text-slate-600">จำนวนอุปกรณ์ทั้งหมด</div>
-            <div className="mt-1 text-2xl font-semibold">{devices.length.toLocaleString()}</div>
+          <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+            <div className="text-sm font-medium text-blue-700/80">จำนวนอุปกรณ์ทั้งหมด</div>
+            <div className="mt-1 text-2xl font-semibold text-blue-700">{devices.length.toLocaleString()}</div>
           </div>
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="text-sm font-medium text-slate-600">ที่เลือกไว้</div>
-            <div className="mt-1 text-2xl font-semibold">{selectedCount.toLocaleString()}</div>
+          <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+            <div className="text-sm font-medium text-blue-700/80">ที่เลือกไว้</div>
+            <div className="mt-1 text-2xl font-semibold text-blue-700">{selectedCount.toLocaleString()}</div>
           </div>
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="text-sm font-medium text-slate-600">สถานะตัวกรอง</div>
+          <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+            <div className="text-sm font-medium text-blue-700/80">ตัวกรอง</div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full bg-slate-100 px-2 py-0.5">status: {filters.status}</span>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5">
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">status: {filters.status}</span>
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
                 dept: {filters.departmentId === "all" ? "ทั้งหมด" : filters.departmentId}
               </span>
-              {filters.search && <span className="rounded-full bg-indigo-100 px-2 py-0.5">ค้นหา: “{filters.search}”</span>}
+              {filters.search && <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">ค้นหา: “{filters.search}”</span>}
             </div>
           </div>
         </div>
 
-        {/* Filters + Import */}
-        <div className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
+        {/* Filters & Import */}
+        <div className="mt-6 rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
           <div className="grid gap-4 md:grid-cols-4">
             <div className="md:col-span-2">
               <Label className="mb-1 block text-xs text-slate-600">ค้นหา</Label>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
                 <Input
                   value={filters.search}
                   onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
                   placeholder="asset_tag / serial / model"
-                  className="pl-9"
+                  className="pl-9 rounded-xl border-blue-200 focus-visible:ring-blue-200"
                 />
               </div>
             </div>
             <div>
               <Label className="mb-1 block text-xs text-slate-600">สถานะ</Label>
               <Select value={filters.status} onValueChange={(v) => setFilters((f) => ({ ...f, status: v as any }))}>
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl border-blue-200 focus:ring-blue-200">
                   <SelectValue placeholder="ทั้งหมด" />
                 </SelectTrigger>
                 <SelectContent>
@@ -505,7 +498,7 @@ export default function InventoryPage() {
             <div>
               <Label className="mb-1 block text-xs text-slate-600">แผนก</Label>
               <Select value={filters.departmentId} onValueChange={(v) => setFilters((f) => ({ ...f, departmentId: v }))}>
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl border-blue-200 focus:ring-blue-200">
                   <SelectValue placeholder="ทั้งหมด" />
                 </SelectTrigger>
                 <SelectContent>
@@ -522,7 +515,7 @@ export default function InventoryPage() {
 
           {/* Import */}
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 hover:bg-slate-100 md:w-auto">
+            <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-blue-200 bg-blue-50/50 px-4 py-3 text-sm text-blue-700 hover:bg-blue-50 md:w-auto">
               <UploadCloud className="h-4 w-4" />
               <span>เลือกไฟล์ CSV เพื่อพรีวิว</span>
               <input
@@ -533,20 +526,20 @@ export default function InventoryPage() {
                 onChange={(e) => handleFilePick(e.target.files?.[0] || undefined)}
               />
             </label>
-            <Button variant="secondary" disabled={!importPreview} onClick={handleImportCommit}>
+            <Button variant="secondary" disabled={!importPreview} onClick={handleImportCommit} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40">
               บันทึกนำเข้า
             </Button>
           </div>
 
           {importPreview && (
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-2 text-sm font-medium text-slate-600">พรีวิว {importPreview.rows.length} แถว</div>
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+              <div className="mb-2 text-sm font-medium text-blue-700">พรีวิว {importPreview.rows.length} แถว</div>
               <div className="max-h-60 overflow-auto rounded-lg border bg-white">
                 <table className="min-w-full text-xs">
-                  <thead className="sticky top-0 bg-slate-50">
+                  <thead className="sticky top-0 bg-blue-50/70">
                     <tr>
                       {importPreview.headers.map((h) => (
-                        <th key={h} className="whitespace-nowrap px-2 py-2 text-left font-semibold text-slate-600">
+                        <th key={h} className="whitespace-nowrap px-2 py-2 text-left font-semibold text-slate-700">
                           {h}
                         </th>
                       ))}
@@ -570,10 +563,10 @@ export default function InventoryPage() {
         </div>
 
         {/* Table */}
-        <div className="mt-6 overflow-hidden rounded-2xl border bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b bg-slate-50/60 px-4 py-3">
-            <div className="text-base font-semibold">รายการอุปกรณ์</div>
-            <div className="text-xs text-slate-500">
+        <div className="mt-6 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b bg-blue-50/50 px-4 py-3">
+            <div className="text-base font-semibold text-blue-800">รายการอุปกรณ์</div>
+            <div className="text-xs text-blue-700">
               แสดง {devices.length.toLocaleString()} รายการ | เลือก {selectedCount.toLocaleString()} รายการ
             </div>
           </div>
@@ -596,11 +589,11 @@ export default function InventoryPage() {
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
                       <td className="border-b px-3 py-3">
-                        <div className="h-4 w-4 rounded bg-slate-200" />
+                        <div className="h-4 w-4 rounded bg-blue-100" />
                       </td>
                       {Array.from({ length: 8 }).map((__, j) => (
                         <td key={j} className="border-b px-3 py-3">
-                          <div className="h-4 w-28 rounded bg-slate-200" />
+                          <div className="h-4 w-28 rounded bg-blue-100" />
                         </td>
                       ))}
                     </tr>
@@ -609,8 +602,8 @@ export default function InventoryPage() {
                 {!loading && devices.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-6 py-16 text-center">
-                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-slate-300">
-                        <Search className="h-6 w-6 text-slate-400" />
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-blue-200">
+                        <Search className="h-6 w-6 text-blue-400" />
                       </div>
                       <div className="mt-3 text-base font-medium text-slate-700">ไม่พบข้อมูล</div>
                       <div className="text-xs text-slate-500">ลองปรับตัวกรองหรือกดรีเฟรช</div>
@@ -619,11 +612,11 @@ export default function InventoryPage() {
                 )}
 
                 {devices.map((d) => (
-                  <tr key={d.id} className="border-b odd:bg-white even:bg-slate-50/40 hover:bg-violet-50/40">
+                  <tr key={d.id} className="border-b odd:bg-white even:bg-blue-50/30 hover:bg-blue-50">
                     <td className="px-3 py-3">
                       <Checkbox checked={!!selected[d.id]} onCheckedChange={() => toggleOne(d.id)} />
                     </td>
-                    <td className="px-3 py-3 font-medium text-slate-800">{d.asset_tag}</td>
+                    <td className="px-3 py-3 font-medium text-slate-900">{d.asset_tag}</td>
                     <td className="px-3 py-3 text-slate-700">{d.serial_no}</td>
                     <td className="px-3 py-3"><StatusBadge value={d.status} /></td>
                     <td className="px-3 py-3 text-slate-700">{d.model ?? "-"}</td>
@@ -632,7 +625,7 @@ export default function InventoryPage() {
                     <td className="px-3 py-3 text-slate-700">{d.last_seen ? new Date(d.last_seen).toLocaleString() : "-"}</td>
                     <td className="px-3 py-2">
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { setEditing(d); setDialogOpen(true); }}>
+                        <Button size="sm" variant="outline" onClick={() => { setEditing(d); setDialogOpen(true); }} className="border-blue-200 text-blue-700 hover:bg-blue-50">
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </div>
@@ -645,7 +638,7 @@ export default function InventoryPage() {
         </div>
       </main>
 
-      {/* Add/Edit Dialog */}
+      {/* Dialog */}
       <DeviceFormDialog
         open={dialogOpen}
         onOpenChange={(o) => {
@@ -656,6 +649,11 @@ export default function InventoryPage() {
         onSaved={fetchDevices}
         departments={departments}
       />
+
+      {/* local tailwind helpers for the page */}
+      <style>{`
+        .btn-blue { background:#2563eb; }
+      `}</style>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";  // นำเข้าไฟล์ CSS หลัก
-
+import { SpeedInsights } from "@vercel/speed-insights/next"
 function ensureRoot(): HTMLElement {
   let el = document.getElementById("root");
   if (!el) {

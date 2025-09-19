@@ -518,8 +518,11 @@ export default function InventoryPage() {
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">status: {filters.status}</span>
               <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
-                dept: {filters.departmentId === "all" ? "ทั้งหมด" : filters.departmentId}
-              </span>
+  dept: {filters.departmentId === "all"
+    ? "ทั้งหมด"
+    : (deptMap[Number(filters.departmentId)] ?? filters.departmentId)}
+</span>
+
               {filters.search && <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">ค้นหา: “{filters.search}”</span>}
             </div>
           </div>
@@ -637,7 +640,8 @@ export default function InventoryPage() {
                   <th className="w-10 px-3 py-3 text-left">
                     <Checkbox checked={!!allSelected} onCheckedChange={toggleAll as any} />
                   </th>
-                  {["asset_tag", "serial_no", "status", "model", "brand", "department_id", "last_seen", "actions"].map((h) => (
+                  {["asset_tag","serial_no","status","model","brand","department","last_seen","actions"].map(h=> (
+
                     <th key={h} className="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                       {h}
                     </th>
@@ -681,7 +685,7 @@ export default function InventoryPage() {
                     <td className="px-3 py-3"><StatusBadge value={d.status} /></td>
                     <td className="px-3 py-3 text-slate-700">{d.model ?? "-"}</td>
                     <td className="px-3 py-3 text-slate-700">{d.brand ?? "-"}</td>
-                    <td className="px-3 py-3 text-slate-700">{d.department_id ?? "-"}</td>
+                    <td className="px-3 py-3 text-slate-700">{d.department_id ? (deptMap[d.department_id] ?? String(d.department_id)) : "-"}</td>
                     <td className="px-3 py-3 text-slate-700">{d.last_seen ? new Date(d.last_seen).toLocaleString() : "-"}</td>
                     <td className="px-3 py-2">
                       <div className="flex gap-2">

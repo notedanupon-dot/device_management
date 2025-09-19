@@ -28,7 +28,7 @@ export type Device = {
   department_id?: number | null;
   deleted_at?: string | null;
 };
-export type Department = { id: number; name: string };
+export type Department = { id: number; name: string; code?: string | null };
 
 /* ================= helpers ================= */
 const LOGO_SRC = "/muto-logo.png"; // วางไฟล์ไว้ที่ public/muto-logo.png
@@ -273,7 +273,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.from("departments").select("id,name").order("name");
+      const { data, error } = await supabase.from("departments").select("id,name,code").order("name");
       if (!error) setDepartments(data || []);
     })();
   }, []);
@@ -354,32 +354,92 @@ export default function InventoryPage() {
   }
 
   async function handleImportCommit() {
-    if (!importPreview) return;
-    const mapped: Partial<Device>[] = importPreview.rows
-      .map((r) => ({
-        asset_tag: r["asset_tag"] ?? r["Asset Tag"] ?? r["asset"] ?? "",
-        serial_no: r["serial_no"] ?? r["Serial"] ?? r["serial"] ?? "",
-        status: ((r["status"] || "active").toLowerCase() as Status),
-        model: r["model"] ?? null,
-        brand: r["brand"] ?? null,
-        department_id: r["department_id"] ? Number(r["department_id"]) : null,
-        last_seen: r["last_seen"] ? new Date(r["last_seen"]).toISOString() : null,
-      }))
-      .filter((x) => x.asset_tag && x.serial_no);
+  if (!importPreview) return;
 
-    if (!mapped.length) {
-      toast.error("ไฟล์ไม่ถูกต้อง: ต้องมี asset_tag และ serial_no");
-      return;
+  // map สำหรับตรวจและแปลงค่าแผนกให้เป็น id ที่มีจริง
+  const deptNameToId = new Map(departments.map(d => [String(d.name).trim().toLowerCase(), d.id]));
+  const deptCodeToId = new Map(departments.map(d => [String(d.code ?? "").trim(), d.id]));
+  const validDeptIds  = new Set(departments.map(d => d.id));
+
+  // helper: แปลงวันที่ให้เป็น ISO 'YYYY-MM-DD'
+  const toIsoDate = (v: string | null | undefined) => {
+    if (!v) return null;
+    const s = String(v).trim();
+    // รูปแบบถูกต้องอยู่แล้ว
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // รองรับ 'DD-MM-YY' → '20YY-MM-DD'
+    const m = s.match(/^(\d{2})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const [_, dd, mm, yy] = m;
+      return `20${yy}-${mm}-${dd}`;
     }
-    try {
-      await upsertBatch(mapped);
-      setImportPreview(null);
-      fetchDevices();
-      toast.success(`นำเข้าแล้ว ${mapped.length} รายการ`);
-    } catch (err: any) {
-      toast.error(err?.message ?? String(err));
-    }
+    // อื่น ๆ: ไม่แปลง
+    return null;
+  };
+
+  const mapped: Partial<Device>[] = importPreview.rows
+    .map((r) => {
+      // ===== หาค่า department_id จากหลายความเป็นไปได้ =====
+      let department_id: number | null = null;
+
+      // 1) ถ้ามีคอลัมน์ 'department' (ชื่อแผนก)
+      const depName = String(r["department"] ?? "").trim().toLowerCase();
+      if (depName && deptNameToId.has(depName)) {
+        department_id = deptNameToId.get(depName)!;
+      }
+
+      // 2) ถ้ายังไม่ได้ ลองอ่านจาก 'department_id' ในไฟล์ (อาจเป็น id, code หรือชื่อ)
+      if (department_id == null) {
+        const raw = String(r["department_id"] ?? "").trim();
+        if (raw !== "") {
+          const asNum = Number(raw);
+          // 2.1 ถ้าเป็นเลข id ที่มีอยู่จริง
+          if (!Number.isNaN(asNum) && validDeptIds.has(asNum)) {
+            department_id = asNum;
+          } else {
+            // 2.2 ถ้าเป็น code (เช่น '15')
+            const viaCode = deptCodeToId.get(raw);
+            if (viaCode) department_id = viaCode;
+
+            // 2.3 ถ้าเป็น "ชื่อแผนก" แต่พิมพ์มาในคอลัมน์ department_id
+            if (department_id == null) {
+              const byName = deptNameToId.get(raw.toLowerCase());
+              if (byName) department_id = byName;
+            }
+          }
+        }
+      }
+
+      // ===== แปลงวันที่ =====
+      const iso = toIsoDate(String(r["last_seen"] ?? ""));
+
+      return {
+        asset_tag: r["asset_tag"] ?? r["Asset Tag"] ?? r["asset"] ?? "",
+        serial_no:  r["serial_no"]  ?? r["Serial"]    ?? r["serial"] ?? "",
+        status:     ((r["status"] || "active").toLowerCase() as Status),
+        model:      r["model"] ?? null,
+        brand:      r["brand"] ?? null,
+        department_id: department_id ?? null,  // กันชน FK
+        last_seen:     iso,
+      };
+    })
+    .filter((x) => x.asset_tag && x.serial_no);
+
+  if (!mapped.length) {
+    toast.error("ไฟล์ไม่ถูกต้อง: ต้องมี asset_tag และ serial_no");
+    return;
   }
+
+  try {
+    await upsertBatch(mapped);
+    setImportPreview(null);
+    fetchDevices();
+    toast.success(`นำเข้าแล้ว ${mapped.length} รายการ`);
+  } catch (err: any) {
+    toast.error(err?.message ?? String(err));
+  }
+}
+
 
   /* ====== QR Print ====== */
   async function handlePrintQR() {
